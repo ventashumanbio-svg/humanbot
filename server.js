@@ -10,8 +10,8 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // ── Clientes ──────────────────────────────────
 const twilioClient = twilio(
@@ -169,7 +169,9 @@ app.post('/twiml/respuesta', (req, res) => {
   let resultado, mensajeFinal;
   if (digit === '1') {
     resultado    = 'interesado';
-    mensajeFinal = 'Excelente, muchas gracias por su interés. En breve le enviamos información por WhatsApp con nuestro catálogo y precios. Que tenga muy buen día.';
+    const numLimpio = prospecto.tel ? String(prospecto.tel).replace(/[^0-9]/g,'').slice(-10) : '';
+    const numFormato = numLimpio ? numLimpio.slice(0,3)+' '+numLimpio.slice(3,7)+' '+numLimpio.slice(7) : '';
+    mensajeFinal = 'Excelente, muchas gracias. Le enviaremos el catálogo y precios de Bohuman Bio por WhatsApp a este número' + (numFormato ? ', el ' + numFormato : '') + '. Que tenga muy buen día.';
   } else if (digit === '2') {
     resultado    = 'no-interesa';
     mensajeFinal = 'Entendido, no hay problema. No le volveremos a llamar. Que tenga buen día.';
@@ -217,7 +219,6 @@ app.get('/resultados', (req, res) => {
 
 // ─────────────────────────────────────────────
 // RUTA 7 — Health check
-// GET /
 // ─────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({
