@@ -248,3 +248,99 @@ app.listen(PORT, () => {
   console.log(`   Twilio número: ${process.env.TWILIO_PHONE_NUMBER || '(no configurado)'}`);
   console.log(`   Server URL:    ${process.env.SERVER_URL || '(no configurado)'}`);
 });
+
+
+// ─────────────────────────────────────────────
+// RUTA 8 — Proxy IA: generar mensaje WhatsApp
+// POST /generar-mensaje
+// ─────────────────────────────────────────────
+app.post('/generar-mensaje', async (req, res) => {
+  const { nombre, tipo, contacto, ciudad, prods, obs, objetivo, firma, promo, nvar, tono } = req.body;
+  if (!nombre || !tipo) return res.status(400).json({ error: 'nombre y tipo son obligatorios' });
+
+  const prompt = `Eres experto en ventas B2B para distribuidoras de productos desechables de plástico para alimentos en México (vasos, platos, contenedores, cubiertos, popotes, bolsas de empaque, charolas, guantes, servilletas, etc.). La empresa se llama ${firma || 'Bohuman Bio'}, distribuidora de desechables para alimentos.
+
+Genera ${nvar || 1} variante${(nvar||1)>1?'s':''} de mensaje de WhatsApp para prospectar en frío. Cada variante debe tener apertura y estructura distinta.
+
+DATOS DEL PROSPECTO:
+- Negocio: ${nombre}
+- Tipo: ${tipo}
+- ${contacto?'Contacto: '+contacto:'Sin nombre de contacto'}
+- ${ciudad?'Zona: '+ciudad:''}
+- ${prods?'Productos de interés: '+prods:'Desechables para alimentos en general'}
+- ${obs?'Observación: '+obs:''}
+- ${promo?'Promoción: '+promo:''}
+
+CONFIGURACIÓN:
+- Tono: ${tono || 'amigable y directo'}
+- Objetivo: ${objetivo || 'presentarse y generar interés'}
+- Firma: ${firma || 'Bohuman Bio'}
+
+REGLAS:
+- Máximo 6 líneas por mensaje, lenguaje natural de WhatsApp
+- No suenes a spam corporativo
+- 1-3 emojis máximo
+- Termina con pregunta o llamada a la acción clara
+- ${contacto?'Usa el nombre del contacto':'Saludo general'}
+- Español mexicano natural
+- ${(nvar||1)>1?'Separa cada variante EXACTAMENTE con la línea: ---VARIANTE [número]---':''}
+- Solo los mensajes, sin explicaciones`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const texto = response.content.map(b => b.text || '').join('');
+    res.json({ ok: true, texto });
+  } catch (err) {
+    console.error('Error generando mensaje:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────
+// RUTA 9 — Proxy IA: generar guión de llamada
+// POST /generar-guion
+// ─────────────────────────────────────────────
+app.post('/generar-guion', async (req, res) => {
+  const { nombre, tipo, contacto, objetivo, prods, tono } = req.body;
+  if (!nombre || !tipo) return res.status(400).json({ error: 'nombre y tipo son obligatorios' });
+
+  const prompt = `Eres experto en ventas B2B para Bohuman Bio, distribuidora de plásticos desechables para alimentos en México.
+
+Genera un guión de llamada telefónica de prospectación en frío. Debe sonar natural, conversacional y no robótico.
+
+DATOS:
+- Negocio: ${nombre}
+- Tipo: ${tipo}
+- ${contacto ? 'Contacto: '+contacto : 'Sin nombre de contacto conocido'}
+- ${prods ? 'Productos a mencionar: '+prods : 'Desechables para alimentos en general'}
+- Objetivo: ${objetivo || 'primer contacto y generar interés'}
+
+ESTRUCTURA DEL GUIÓN (usa estas etiquetas exactas):
+[APERTURA] — Saludo, presentación de 2 líneas máximo
+[GANCHO] — Frase de valor en 1 oración que enganche
+[PROPUESTA] — Qué ofreces y por qué les conviene (2-3 líneas)
+[MANEJO DE OBJECIÓN] — Respuesta breve si dicen "no me interesa" o "ya tenemos proveedor"
+[CIERRE] — Siguiente paso concreto
+
+REGLAS:
+- Español mexicano natural
+- Máximo 200 palabras totales
+- Sin frases corporativas vacías
+- Solo el guión, sin explicaciones`;
+
+  try {
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 600,
+      messages: [{ role: 'user', content: prompt }]
+    });
+    const texto = response.content.map(b => b.text || '').join('').trim();
+    res.json({ ok: true, texto });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
